@@ -1,0 +1,597 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Khan Academy offers free, world-class education for anyone, anywhere. Explore interactive courses in math, science, humanities, and more.">
+    <meta name="keywords" content="free education, online courses, math, science, humanities, Khan Academy">
+    <meta name="author" content="Khan Academy">
+    <title>Khan Academy - Free Online Courses</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Open Sans) -->
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- GSAP for Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/ScrollTrigger.min.js"></script>
+    <!-- Particle.js -->
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        /* Dark Mode */
+        body.dark-mode {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        body.dark-mode .bg-white {
+            background-color: #2d3748;
+        }
+        body.dark-mode .bg-gray-100 {
+            background-color: #4a5568;
+        }
+        body.dark-mode .text-gray-800 {
+            color: #e2e8f0;
+        }
+        body.dark-mode .bg-blue-600 {
+            background-color: #2b6cb0;
+        }
+        /* Smooth Scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+        /* Hero Animation */
+        .hero-text {
+            animation: fadeIn 1.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        /* Card Hover Effect */
+        .course-card:hover {
+            transform: translateY(-5px);
+            transition: transform 0.3s ease;
+        }
+        /* Particle Background */
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 30;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            max-width: 90%;
+            width: 400px;
+        }
+        body.dark-mode .modal-content {
+            background: #2d3748;
+            color: #e2e8f0;
+        }
+        .error {
+            color: #e53e3e;
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        /* Hamburger Menu */
+        #menu-toggle {
+            display: none;
+        }
+        #menu {
+            display: flex;
+        }
+        @media (max-width: 768px) {
+            #menu-toggle {
+                display: block;
+            }
+            #menu {
+                display: none;
+                flex-direction: column;
+                position: absolute;
+                top: 60px;
+                left: 0;
+                width: 100%;
+                background: white;
+                padding: 1rem;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            body.dark-mode #menu {
+                background: #2d3748;
+            }
+            #menu.active {
+                display: flex;
+            }
+            #menu a, #menu button {
+                margin: 0.5rem 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-white shadow-md z-20">
+        <div class="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-xl sm:text-2xl font-bold text-blue-800">Khan Academy</a>
+            <button id="menu-toggle" class="md:hidden p-2" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div id="menu" class="items-center space-y-2 md:space-y-0 md:flex md:space-x-6">
+                <!-- Search Bar -->
+                <div class="relative w-full md:w-auto">
+                    <input type="text" id="search" placeholder="Search courses..." class="w-full px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Search courses">
+                    <svg class="w-5 h-5 absolute right-3 top-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <!-- Course Dropdown -->
+                <div class="relative group">
+                    <button class="hover:text-blue-600 flex items-center">Courses <i class="fas fa-chevron-down ml-1(insert icon here) ml-1"></i></button>
+                    <div class="absolute hidden group-hover:block bg-white shadow-lg rounded-lg mt-2 w-48">
+                        <a href="#" class="block px-4 py-2 hover:bg-blue-100" data-filter="math">Math</a>
+                        <a href="#" class="block px-4 py-2 hover:bg-blue-100" data-filter="science">Science</a>
+                        <a href="#" class="block px-4 py-2 hover:bg-blue-100" data-filter="humanities">Humanities</a>
+                        <a href="#" class="block px-4 py-2 hover:bg-blue-100" data-filter="computing">Computing</a>
+                    </div>
+                </div>
+                <a href="#" class="hover:text-blue-600">Teachers</a>
+                <a href="#" class="hover:text-blue-600">Parents</a>
+                <a href="#" class="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 text-center" id="signup-btn">Sign Up</a>
+                <a href="#" class="hover:text-blue-600 text-center" id="login-btn">Log In</a>
+                <!-- Dark Mode Toggle -->
+                <button id="dark-mode-toggle" class="p-2 rounded-full hover:bg-gray-200" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="relative min-h-[60vh] sm:min-h-[80vh] md:min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-600 to-blue-800 text-white overflow-hidden">
+        <div id="particles-js"></div>
+        <div class="container mx-auto px-4 sm:px-6 text-center relative z-10">
+            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold hero-text">A free, world-class education for anyone, anywhere</h1>
+            <p class="mt-4 text-base sm:text-lg md:text-xl max-w-xl sm:max-w-2xl mx-auto">Learn math, science, humanities, and more with free videos, exercises, and quizzes.</p>
+            <a href="#courses" class="mt-6 inline-block px-6 sm:px-8 py-3 bg-white text-blue-600 font-semibold rounded-full hover:bg-blue-600 hover:text-white transition text-sm sm:text-base">Start Learning Now</a>
+        </div>
+    </section>
+
+    <!-- Featured Courses -->
+    <section id="courses" class="py-12 sm:py-16 md:py-20 bg-white">
+        <div class="container mx-auto px-4 sm:px-6">
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-8 sm:mb-12">Explore Our Courses</h2>
+            <div id="course-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                <!-- Course Card: Math -->
+                <div class="course-card bg-gray-100 rounded-lg shadow-lg overflow-hidden" data-subject="math">
+                    <img src="https://via.placeholder.com/400x200?text=Math" alt="Math course" class="w-full h-40 sm:h-48 object-cover lazy" loading="lazy">
+                    <div class="p-4 sm:p-6">
+                        <h3 class="text-lg sm:text-xl font-semibold">Math</h3>
+                        <p class="mt-2 text-gray-600 text-sm sm:text-base">Master algebra, calculus, and more with interactive lessons.</p>
+                        <button class="mt-4 inline-block text-blue-600 hover:underline view-course text-sm sm:text-base" data-course="math">View Course</button>
+                    </div>
+                </div>
+                <!-- Course Card: Science -->
+                <div class="course-card bg-gray-100 rounded-lg shadow-lg overflow-hidden" data-subject="science">
+                    <img src="https://via.placeholder.com/400x200?text=Science" alt="Science course" class="w-full h-40 sm:h-48 object-cover lazy" loading="lazy">
+                    <div class="p-4 sm:p-6">
+                        <h3 class="text-lg sm:text-xl font-semibold">Science</h3>
+                        <p class="mt-2 text-gray-600 text-sm sm:text-base">Explore physics, chemistry, and biology with engaging content.</p>
+                        <button class="mt-4 inline-block text-blue-600 hover:underline view-course text-sm sm:text-base" data-course="science">View Course</button>
+                    </div>
+                </div>
+                <!-- Course Card: Humanities -->
+                <div class="course-card bg-gray-100 rounded-lg shadow-lg overflow-hidden" data-subject="humanities">
+                    <img src="https://via.placeholder.com/400x200?text=Humanities" alt="Humanities course" class="w-full h-40 sm:h-48 object-cover lazy" loading="lazy">
+                    <div class="p-4 sm:p-6">
+                        <h3 class="text-lg sm:text-xl font-semibold">Humanities</h3>
+                        <p class="mt-2 text-gray-600 text-sm sm:text-base">Dive into history, art, and literature with expert-led lessons.</p>
+                        <button class="mt-4 inline-block text-blue-600 hover:underline view-course text-sm sm:text-base" data-course="humanities">View Course</button>
+                    </div>
+                </div>
+                <!-- Course Card: Computing -->
+                <div class="course-card bg-gray-100 rounded-lg shadow-lg overflow-hidden" data-subject="computing">
+                    <img src="https://via.placeholder.com/400x200?text=Computing" alt="Computing course" class="w-full h-40 sm:h-48 object-cover lazy" loading="lazy">
+                    <div class="p-4 sm:p-6">
+                        <h3 class="text-lg sm:text-xl font-semibold">Computing</h3>
+                        <p class="mt-2 text-gray-600 text-sm sm:text-base">Learn coding, algorithms, and computer science fundamentals.</p>
+                        <button class="mt-4 inline-block text-blue-600 hover:underline view-course text-sm sm:text-base" data-course="computing">View Course</button>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-8 sm:mt-12">
+                <a href="#" class="px-6 sm:px-8 py-3 bg-blue-600 text-white font-semibold rounded-full hover:bg-blue-700 text-sm sm:text-base">View All Courses</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Mission Section -->
+    <section id="mission" class="py-12 sm:py-16 md:py-20 bg-gray-100">
+        <div class="container mx-auto px-4 sm:px-6 text-center">
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-6">Our Mission</h2>
+            <p class="text-base sm:text-lg md:text-xl max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">Khan Academy is a nonprofit with the mission to provide a free, world-class education for anyone, anywhere. Join millions of learners today!</p>
+            <a href="#" class="mt-6 inline-block px-6 sm:px-8 py-3 bg-blue-600 text-white font-semibold rounded-full hover:bg-blue-700 text-sm sm:text-base">Learn More</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-8 sm:py-10 bg-blue-800 text-white">
+        <div class="container mx-auto px-4 sm:px-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                <div>
+                    <h3 class="text-base sm:text-lg font-semibold mb-4">Khan Academy</h3>
+                    <p class="text-sm sm:text-base">Free online courses, lessons, and practice for all ages.</p>
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-semibold mb-4">About</h3>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Our Story</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Team</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Careers</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Press</a>
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-semibold mb-4">Resources</h3>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Teachers</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Parents</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Help Center</a>
+                    <a href="#" class="block hover:underline text-sm sm:text-base">Privacy Policy</a>
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-semibold mb-4">Connect</h3>
+                    <div class="flex space-x-4">
+                        <a href="#" aria-label="Facebook" class="text-sm sm:text-base"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" aria-label="Twitter" class="text-sm sm:text-base"><i class="fab fa-twitter"></i></a>
+                        <a href="#" aria-label="YouTube" class="text-sm sm:text-base"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+            </div>
+            <p class="text-center mt-6 sm:mt-8 text-sm sm:text-base">© 2025 Khan Academy. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl sm:text-2xl font-bold mb-4">Log In</h2>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="login-email" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="login-email" class="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" required>
+                    <p id="login-email-error" class="error hidden">Please enter a valid email.</p>
+                </div>
+                <div class="mb-4">
+                    <label for="login-password" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="login-password" class="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" required>
+                    <p id="login-password-error" class="error hidden">Password must be at least 6 characters.</p>
+                </div>
+                <button type="submit" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm sm:text-base">Log In</button>
+            </form>
+            <button class="mt-4 text-blue-600 hover:underline close-modal text-sm sm:text-base">Close</button>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signup-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl sm:text-2xl font-bold mb-4">Sign Up</h2>
+            <form id="signup-form">
+                <div class="mb-4">
+                    <label for="signup-name" class="block text-sm font-medium">Name</label>
+                    <input type="text" id="signup-name" class="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" required>
+                    <p id="signup-name-error" class="error hidden">Name is required.</p>
+                </div>
+                <div class="mb-4">
+                    <label for="signup-email" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="signup-email" class="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" required>
+                    <p id="signup-email-error" class="error hidden">Please enter a valid email.</p>
+                </div>
+                <div class="mb-4">
+                    <label for="signup-password" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="signup-password" class="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base" required>
+                    <p id="signup-password-error" class="error hidden">Password must be at least 6 characters.</p>
+                </div>
+                <button type="submit" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm sm:text-base">Sign Up</button>
+            </form>
+            <button class="mt-4 text-blue-600 hover:underline close-modal text-sm sm:text-base">Close</button>
+        </div>
+    </div>
+
+    <!-- Course Detail Modal -->
+    <div id="course-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="course-title" class="text-xl sm:text-2xl font-bold mb-4"></h2>
+            <p id="course-description" class="mb-4 text-sm sm:text-base"></p>
+            <div class="mb-4">
+                <h3 class="text-base sm:text-lg font-semibold">Preview Lesson</h3>
+                <div id="course-video" class="w-full h-40 sm:h-48 bg-gray-200 flex items-center justify-center">
+                    <p class="text-sm sm:text-base">Video Player Placeholder</p>
+                </div>
+            </div>
+            <a href="#" class="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm sm:text-base">Start Course</a>
+            <button class="mt-4 text-blue-600 hover:underline close-modal text-sm sm:text-base">Close</button>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Mock Course Data
+        const courses = {
+            math: {
+                title: 'Math',
+                description: 'Master algebra, calculus, geometry, and more with interactive lessons and practice problems.',
+                video: 'https://www.youtube.com/embed/xyz' // Placeholder
+            },
+            science: {
+                title: 'Science',
+                description: 'Explore physics, chemistry, and biology with engaging lessons and experiments.',
+                video: 'https://www.youtube.com/embed/abc' // Placeholder
+            },
+            humanities: {
+                title: 'Humanities',
+                description: 'Dive into history, art, literature, and economics with expert-led content.',
+                video: 'https://www.youtube.com/embed/def' // Placeholder
+            },
+            computing: {
+                title: 'Computing',
+                description: 'Learn coding, algorithms, and computer science fundamentals from scratch.',
+                video: 'https://www.youtube.com/embed/ghi' // Placeholder
+            }
+        };
+
+        // Initialize Particles.js
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 50, density: { enable: true, value_area: 800 } },
+                color: { value: '#ffffff' },
+                shape: { type: 'circle' },
+                opacity: { value: 0.4, random: false },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: '#ffffff', opacity: 0.3, width: 1 },
+                move: { enable: true, speed: 3, direction: 'none', random: false }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: { onhover: { enable: true, mode: 'repulse' }, onclick: { enable: true, mode: 'push' } },
+                modes: { repulse: { distance: 100 }, push: { particles_nb: 4 } }
+            },
+            retina_detect: true
+        });
+
+        // Smooth Scroll
+        document.querySelectorAll('a[hre').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // GSAP Scroll Animations
+        gsap.registerPlugin(ScrollTrigger);
+        gsap.from('.course-card', {
+            opacity: 0,
+            y: 50,
+            duration: 1,
+            stagger: 0.2,
+            scrollTrigger: {
+                trigger: '#courses',
+                start: 'top 80%'
+            }
+        });
+        gsap.from('#mission h2, #mission p, #mission a', {
+            opacity: 0,
+            y: 30,
+            duration: 1,
+            stagger: 0.3,
+            scrollTrigger: {
+                trigger: '#mission',
+                start: 'top 80%'
+            }
+        });
+
+        // Search Filter
+        const searchInput = document.getElementById('search');
+        const courseCards = document.querySelectorAll('.course-card');
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase();
+            courseCards.forEach(card => {
+                const subject = card.getAttribute('data-subject');
+                card.style.display = subject.includes(query) || query === '' ? 'block' : 'none';
+            });
+        });
+
+        // Course Dropdown Filter
+        document.querySelectorAll('[data-filter]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const filter = link.getAttribute('data-filter');
+                courseCards.forEach(card => {
+                    const subject = card.getAttribute('data-subject');
+                    card.style.display = filter === subject || filter === '' ? 'block' : 'none';
+                });
+            });
+        });
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
+        const body = document.body;
+        darkModeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            darkModeToggle.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            localStorage.setItem('darkMode', isDark);
+        });
+        if (localStorage.getItem('darkMode') === 'true') {
+            body.classList.add('dark-mode');
+            darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+
+        // Hamburger Menu
+        const menuToggle = document.getElementById('menu-toggle');
+        const menu = document.getElementById('menu');
+        menuToggle.addEventListener('click', () => {
+            menu.classList.toggle('active');
+            menuToggle.innerHTML = menu.classList.contains('active') ? '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
+        });
+
+        // Modal Handling
+        const modals = document.querySelectorAll('.modal');
+        const closeModalButtons = document.querySelectorAll('.close-modal');
+        const loginBtn = document.getElementById('login-btn');
+        const signupBtn = document.getElementById('signup-btn');
+        const loginModal = document.getElementById('login-modal');
+        const signupModal = document.getElementById('signup-modal');
+        const courseModal = document.getElementById('course-modal');
+
+        loginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginModal.style.display = 'flex';
+            menu.classList.remove('active');
+            menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        });
+        signupBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupModal.style.display = 'flex';
+            menu.classList.remove('active');
+            menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        });
+        closeModalButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modals.forEach(modal => modal.style.display = 'none');
+            });
+        });
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                modals.forEach(modal => modal.style.display = 'none');
+            }
+        });
+
+        // Form Validation
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const emailError = document.getElementById('login-email-error');
+            const passwordError = document.getElementById('login-password-error');
+            let valid = true;
+            emailError.classList.add('hidden');
+            passwordError.classList.add('hidden');
+            if (!email.includes('@')) {
+                emailError.classList.remove('hidden');
+                valid = false;
+            }
+            if (password.length < 6) {
+                passwordError.classList.remove('hidden');
+                valid = false;
+            }
+            if (valid) {
+                alert('Login successful! (Mock response)');
+                loginModal.style.display = 'none';
+            }
+        });
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const nameError = document.getElementById('signup-name-error');
+            const emailError = document.getElementById('signup-email-error');
+            const passwordError = document.getElementById('signup-password-error');
+            let valid = true;
+            nameError.classList.add('hidden');
+            emailError.classList.add('hidden');
+            passwordError.classList.add('hidden');
+            if (!name) {
+                nameError.classList.remove('hidden');
+                valid = false;
+            }
+            if (!email.includes('@')) {
+                emailError.classList.remove('hidden');
+                valid = false;
+            }
+            if (password.length < 6) {
+                passwordError.classList.remove('hidden');
+                valid = false;
+            }
+            if (valid) {
+                alert('Signup successful! (Mock response)');
+                signupModal.style.display = 'none';
+            }
+        });
+
+        // Course Detail Modal
+        document.querySelectorAll('.view-course').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const courseId = btn.getAttribute('data-course');
+                const course = courses[courseId];
+                document.getElementById('course-title').textContent = course.title;
+                document.getElementById('course-description').textContent = course.description;
+                document.getElementById('course-video').innerHTML = `<p class="text-sm sm:text-base">Video Player Placeholder for ${course.title}</p>`;
+                courseModal.style.display = 'flex';
+                menu.classList.remove('active');
+                menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+            });
+        });
+    </script>
+</body>
+</html>
